@@ -1,1 +1,510 @@
-Hello!
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claimark — 특허 청구항 보정 시스템</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --error: #dc2626;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+    header p  { font-size: 0.85rem; color: var(--muted); }
+
+    /* ── Layout ── */
+    main {
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    /* ── Input row ── */
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus { border-color: var(--primary); }
+
+    button {
+      padding: 10px 22px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: var(--primary-dark); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Status badge ── */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .badge-pending  { background: #fef9c3; color: #854d0e; }
+    .badge-queued   { background: #fef9c3; color: #854d0e; }
+    .badge-running  { background: #dbeafe; color: #1d4ed8; }
+    .badge-done     { background: #dcfce7; color: #15803d; }
+    .badge-error    { background: #fee2e2; color: #b91c1c; }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      background: #e2e8f0;
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+      margin: 12px 0 6px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+    .progress-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* ── Result tabs ── */
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+    .tab-btn {
+      padding: 8px 18px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      font-family: inherit;
+      resize: vertical;
+      background: #f8fafc;
+      color: var(--text);
+    }
+
+    /* ── Meta grid ── */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .meta-item { background: #f1f5f9; border-radius: 8px; padding: 10px 14px; }
+    .meta-item .label { font-size: 0.75rem; color: var(--muted); margin-bottom: 2px; }
+    .meta-item .value { font-size: 0.95rem; font-weight: 600; }
+
+    /* ── Tag list ── */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .tag {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+    }
+    .tag-gap { background: #fee2e2; color: #b91c1c; }
+
+    /* ── Download btn ── */
+    .dl-btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 14px;
+      background: #f1f5f9;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .dl-btn:hover { background: #e2e8f0; }
+
+    /* ── Log box ── */
+    details { margin-top: 12px; }
+    summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); user-select: none; }
+    .log-box {
+      margin-top: 8px;
+      background: #0f172a;
+      color: #94a3b8;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      max-height: 240px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* ── Error box ── */
+    .error-box {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 0.87rem;
+      color: #7f1d1d;
+      white-space: pre-wrap;
+      font-family: monospace;
+    }
+
+    #section-progress, #section-result { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚖️ Claimark</h1>
+    <p>특허 청구항 보정 자동화 시스템 (7 Module Pipeline)</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── 입력 카드 ── -->
+  <div class="card">
+    <h2>출원번호로 분석 시작</h2>
+    <div class="input-row">
+      <input type="text" id="appId" placeholder="예: 18357321" maxlength="20" />
+      <button id="btnSubmit" onclick="submitJob()">▶ 분석</button>
+    </div>
+    <p id="inputError" style="color:var(--error);font-size:0.83rem;margin-top:8px;display:none"></p>
+  </div>
+
+  <!-- ── 진행 카드 ── -->
+  <div class="card" id="section-progress">
+    <h2>
+      진행 상황
+      <span id="statusBadge" class="badge badge-pending" style="margin-left:8px">대기 중</span>
+    </h2>
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+    <p class="progress-label" id="progressLabel">준비 중...</p>
+    <details id="logDetails">
+      <summary>실행 로그 펼치기</summary>
+      <div class="log-box" id="logBox"></div>
+    </details>
+  </div>
+
+  <!-- ── 결과 카드 ── -->
+  <div class="card" id="section-result">
+    <h2>결과</h2>
+
+    <!-- 메타 정보 -->
+    <div class="meta-grid">
+      <div class="meta-item"><div class="label">출원번호</div><div class="value" id="rAppNum">—</div></div>
+      <div class="meta-item"><div class="label">심사관</div><div class="value" id="rExaminer">—</div></div>
+      <div class="meta-item"><div class="label">Art Unit</div><div class="value" id="rArtUnit">—</div></div>
+      <div class="meta-item"><div class="label">δ threshold</div><div class="value" id="rDelta">—</div></div>
+      <div class="meta-item"><div class="label">B 요소 수</div><div class="value" id="rBElems">—</div></div>
+      <div class="meta-item"><div class="label">Alpha PCM</div><div class="value" id="rPcmAlpha">—</div></div>
+    </div>
+
+    <!-- PA / Gap 태그 -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:4px">인용 선행기술</div>
+      <div class="tag-list" id="rPaList"></div>
+      <div style="font-size:0.82rem;color:var(--muted);margin:10px 0 4px">Claim 1 Gap (심사관 미가르침)</div>
+      <div class="tag-list" id="rGapList"></div>
+    </div>
+
+    <!-- 탭: 원본 / Alpha / Combination -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('orig', this)">원본 Claim 1</button>
+      <button class="tab-btn" onclick="switchTab('alpha', this)">Alpha 보정안</button>
+      <button class="tab-btn" onclick="switchTab('combo', this)">Combination 보정안</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-orig">
+      <textarea id="rOrig" rows="7" readonly></textarea>
+    </div>
+    <div class="tab-panel" id="tab-alpha">
+      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:6px">
+        추가 요소: <strong id="rElemAlpha"></strong>
+        &nbsp;|&nbsp; PCM: <strong id="rPcmAlpha2"></strong>
+      </div>
+      <textarea id="rAlpha" rows="8" readonly></textarea>
+      <a class="dl-btn" id="dlAlpha">⬇ 다운로드</a>
+    </div>
+    <div class="tab-panel" id="tab-combo">
+      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:6px">
+        추가 요소: <strong id="rElemCombo"></strong>
+        &nbsp;|&nbsp; PCM: <strong id="rPcmCombo"></strong>
+      </div>
+      <textarea id="rCombo" rows="8" readonly></textarea>
+      <a class="dl-btn" id="dlCombo">⬇ 다운로드</a>
+    </div>
+  </div>
+
+  <!-- ── 에러 카드 ── -->
+  <div class="card" id="section-error" style="display:none">
+    <h2 style="color:var(--error)">오류 발생</h2>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+</main>
+
+<script>
+  // ── 설정 ─────────────────────────────────────────────────
+  // ※ 실제 서버 IP/도메인으로 교체하세요
+  const API_BASE = "http://203.252.112.59:5000";
+  const POLL_MS  = 3000;  // 폴링 간격 (ms)
+
+  let _pollTimer = null;
+  let _currentJobId = null;
+
+  // ── 작업 제출 ─────────────────────────────────────────────
+  async function submitJob() {
+    const appId = document.getElementById("appId").value.trim();
+    const errEl = document.getElementById("inputError");
+
+    if (!appId) {
+      errEl.textContent = "출원번호를 입력해주세요.";
+      errEl.style.display = "block";
+      return;
+    }
+    errEl.style.display = "none";
+
+    document.getElementById("btnSubmit").disabled = true;
+    resetUI();
+
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ app_id: appId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || "작업 생성 실패");
+        document.getElementById("btnSubmit").disabled = false;
+        return;
+      }
+
+      _currentJobId = data.job_id;
+      document.getElementById("section-progress").style.display = "block";
+      startPolling(_currentJobId);
+
+    } catch (e) {
+      showError(`서버 연결 실패: ${e.message}\n\nAPI 서버(${API_BASE})가 실행 중인지 확인하세요.`);
+      document.getElementById("btnSubmit").disabled = false;
+    }
+  }
+
+  // ── 폴링 ─────────────────────────────────────────────────
+  function startPolling(jobId) {
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(() => pollJob(jobId), POLL_MS);
+    pollJob(jobId);
+  }
+
+  async function pollJob(jobId) {
+    try {
+      const res  = await fetch(`${API_BASE}/api/jobs/${jobId}`);
+      const data = await res.json();
+      updateProgress(data);
+
+      if (data.status === "done" || data.status === "error") {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+        document.getElementById("btnSubmit").disabled = false;
+      }
+    } catch (e) {
+      // 일시적 네트워크 오류 무시
+    }
+  }
+
+  // ── UI 업데이트 ───────────────────────────────────────────
+  function updateProgress(data) {
+    const badge    = document.getElementById("statusBadge");
+    const bar      = document.getElementById("progressBar");
+    const label    = document.getElementById("progressLabel");
+    const logBox   = document.getElementById("logBox");
+
+    const statusMap = {
+      pending: ["대기 중",    "badge-pending"],
+      queued:  ["GPU 대기 중", "badge-queued"],
+      running: ["실행 중",    "badge-running"],
+      done:    ["완료",       "badge-done"],
+      error:   ["오류",       "badge-error"],
+    };
+    const [text, cls] = statusMap[data.status] || ["알 수 없음", "badge-pending"];
+    badge.textContent = text;
+    badge.className   = `badge ${cls}`;
+
+    bar.style.width       = `${data.progress || 0}%`;
+    label.textContent     = data.step || "";
+    logBox.textContent    = (data.logs || []).join("\n");
+    logBox.scrollTop      = logBox.scrollHeight;
+
+    if (data.status === "done" && data.result) {
+      showResult(data.result);
+    }
+    if (data.status === "error") {
+      showError(data.error || "알 수 없는 오류");
+    }
+  }
+
+  // ── 결과 표시 ─────────────────────────────────────────────
+  function showResult(r) {
+    document.getElementById("section-result").style.display = "block";
+
+    document.getElementById("rAppNum").textContent   = r.application_number || "—";
+    document.getElementById("rExaminer").textContent = r.examiner_name || "미확인";
+    document.getElementById("rArtUnit").textContent  = r.art_unit || "—";
+    document.getElementById("rDelta").textContent    =
+      r.delta_threshold != null ? r.delta_threshold.toFixed(4) : "—";
+    document.getElementById("rBElems").textContent   = r.num_b_elements ?? "—";
+    document.getElementById("rPcmAlpha").textContent =
+      r.pcm_alpha != null ? r.pcm_alpha.toFixed(4) : "—";
+
+    // PA 태그
+    const paList = document.getElementById("rPaList");
+    paList.innerHTML = "";
+    (r.pa_registry || []).forEach(pa => {
+      const t = document.createElement("span");
+      t.className = "tag";
+      t.textContent = pa;
+      paList.appendChild(t);
+    });
+
+    // Gap 태그
+    const gapList = document.getElementById("rGapList");
+    gapList.innerHTML = "";
+    (r.claim1_gaps || []).forEach(g => {
+      const t = document.createElement("span");
+      t.className = "tag tag-gap";
+      t.textContent = g.length > 60 ? g.slice(0, 57) + "…" : g;
+      t.title = g;
+      gapList.appendChild(t);
+    });
+
+    // 텍스트
+    document.getElementById("rOrig").value      = r.claim1_original || "";
+    document.getElementById("rAlpha").value     = r.amended_claim1_alpha || "";
+    document.getElementById("rCombo").value     = r.amended_claim1_combination || "";
+    document.getElementById("rElemAlpha").textContent = r.top1_element_alpha || "—";
+    document.getElementById("rElemCombo").textContent = r.top1_element_combination || "—";
+    document.getElementById("rPcmAlpha2").textContent =
+      r.pcm_alpha != null ? r.pcm_alpha.toFixed(4) : "—";
+    document.getElementById("rPcmCombo").textContent  =
+      r.pcm_combination != null ? r.pcm_combination.toFixed(4) : "—";
+
+    // 다운로드 링크
+    makeDownload("dlAlpha", r.amended_claim1_alpha,
+      `${r.application_number}_amended_alpha.txt`);
+    makeDownload("dlCombo", r.amended_claim1_combination,
+      `${r.application_number}_amended_combination.txt`);
+  }
+
+  function makeDownload(id, text, filename) {
+    const el   = document.getElementById(id);
+    const blob = new Blob([text || ""], { type: "text/plain" });
+    el.href     = URL.createObjectURL(blob);
+    el.download = filename;
+  }
+
+  function showError(msg) {
+    document.getElementById("section-error").style.display = "block";
+    document.getElementById("errorBox").textContent = msg;
+  }
+
+  // ── 탭 전환 ───────────────────────────────────────────────
+  function switchTab(name, btn) {
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.getElementById(`tab-${name}`).classList.add("active");
+    btn.classList.add("active");
+  }
+
+  // ── UI 초기화 ─────────────────────────────────────────────
+  function resetUI() {
+    ["section-result", "section-error"].forEach(id => {
+      document.getElementById(id).style.display = "none";
+    });
+    document.getElementById("progressBar").style.width = "0%";
+    document.getElementById("logBox").textContent = "";
+    document.getElementById("progressLabel").textContent = "준비 중...";
+  }
+
+  // Enter 키 제출
+  document.getElementById("appId").addEventListener("keydown", e => {
+    if (e.key === "Enter") submitJob();
+  });
+</script>
+</body>
+</html>
