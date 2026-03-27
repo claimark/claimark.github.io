@@ -250,10 +250,8 @@
       <div class="form-group"><label>Letter Number</label><input type="text" id="oaLetterNum" placeholder="e.g., 01" /></div>
       <div class="form-group"><label>Attorney Initials</label><input type="text" id="oaInitials" placeholder="SL/" value="SL/" /></div>
     </div>
-    <div style="display:flex;gap:20px;margin-bottom:16px">
-      <label class="checkbox-row"><input type="checkbox" id="oaIds" /> Include IDS</label>
-      <label class="checkbox-row"><input type="checkbox" id="oaOcr" /> Force OCR</label>
-    </div>
+    <input type="hidden" id="oaIds" value="false" />
+    <input type="hidden" id="oaOcr" value="false" />
     <button id="btnOaSubmit" onclick="submitOaReport()">Generate Report</button>
     <p class="err-msg" id="oaErr"></p>
   </div>
@@ -366,8 +364,8 @@ async function submitOaReport() {
   fd.append("oa_pdf", fileInput.files[0]);
   fd.append("title", title); fd.append("your_ref", ref); fd.append("letter_num", num);
   fd.append("attorney_initials", document.getElementById("oaInitials").value || "SL/");
-  fd.append("has_ids", document.getElementById("oaIds").checked);
-  fd.append("force_ocr", document.getElementById("oaOcr").checked);
+  fd.append("has_ids", "false");
+  fd.append("force_ocr", "false");
   try {
     const res = await fetch(API_BASE + "/api/oa-report/jobs", { method: "POST", headers: authHeaders(), body: fd });
     const data = await res.json();
