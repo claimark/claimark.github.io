@@ -200,10 +200,39 @@
         <div class="model-desc">Claude Sonnet (Anthropic)</div>
       </div>
     </div>
-    <div class="input-row">
+    <div class="input-row" style="margin-bottom:14px">
       <input type="text" id="appId" placeholder="Application No. (e.g., 18853254)" maxlength="20" />
       <button id="btnAmendSubmit" onclick="submitAmendment()">Run</button>
     </div>
+
+    <details style="margin-bottom:12px">
+      <summary style="font-size:0.85rem;color:var(--muted);cursor:pointer">Advanced Options</summary>
+      <div style="margin-top:10px">
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Amendment Scope</label>
+            <select id="optScope">
+              <option value="conservative">Conservative (minimal change)</option>
+              <option value="balanced" selected>Balanced (default)</option>
+              <option value="aggressive">Aggressive (broader protection)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Candidate Limit (0 = process all)</label>
+            <input type="number" id="optTopK" value="0" min="0" max="20" style="width:100%" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Report Sections</label>
+          <select id="optReport">
+            <option value="full" selected>Full Report (all sections)</option>
+            <option value="m1,m6,m7">Summary Only (Analysis + Verification + Ranking)</option>
+            <option value="none">No Report (results only)</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
     <p class="hint">Missing input files will be auto-generated via USPTO API.</p>
     <p class="err-msg" id="amendErr"></p>
   </div>
@@ -222,16 +251,22 @@
       <div class="meta-item"><div class="label">Elements</div><div class="value" id="rElemCount">-</div></div>
       <div class="meta-item"><div class="label">Elapsed</div><div class="value" id="rElapsed">-</div></div>
       <div class="meta-item"><div class="label">Model</div><div class="value" id="rModel">-</div></div>
+      <div class="meta-item"><div class="label">Scope</div><div class="value" id="rScope">-</div></div>
     </div>
     <div style="margin-bottom:16px"><div style="font-size:0.82rem;color:var(--muted);margin-bottom:4px">Prior Arts</div><div class="tag-list" id="rPaList"></div></div>
     <div id="amendReportSection" class="hidden" style="margin-bottom:18px"><button class="btn" onclick="downloadReport()">Download Report (.docx)</button></div>
     <div class="section-header">Original Claim 1</div>
     <textarea id="rOrigClaim" rows="5" readonly></textarea>
     <div class="section-header">Final Ranking (M7)</div>
-    <table class="rank-table"><thead><tr><th>Rank</th><th>ID</th><th>Scope</th><th>Diff</th><th>Arg</th><th>Total</th><th>Summary</th></tr></thead><tbody id="rankBody"></tbody></table>
+    <table class="rank-table"><thead><tr><th>Rank</th><th>ID</th><th>Scope Impact</th><th>Differentiation</th><th>Persuasiveness</th><th>Summary</th></tr></thead><tbody id="rankBody"></tbody></table>
     <div class="section-header">Top Amendments</div>
     <div class="tabs" id="amendTabs"></div>
     <div id="amendPanels"></div>
+
+    <div id="citationSection" class="hidden">
+      <div class="section-header">Citation Evidence (Top 3)</div>
+      <div id="citationPanels"></div>
+    </div>
   </div>
   <div class="card hidden" id="amend-error"><h2 style="color:var(--error)">Error</h2><div class="error-box" id="amendErrorBox"></div></div>
 </div>
@@ -336,7 +371,13 @@ async function submitAmendment() {
   try {
     const res = await fetch(API_BASE + "/api/amendment/jobs", {
       method: "POST", headers: {...authHeaders(), "Content-Type":"application/json"},
-      body: JSON.stringify({app_id: appId, model: _selectedModel}),
+      body: JSON.stringify({
+        app_id: appId,
+        model: _selectedModel,
+        scope_strength: document.getElementById("optScope").value,
+        top_k: parseInt(document.getElementById("optTopK").value) || 0,
+        report_sections: document.getElementById("optReport").value,
+      }),
     });
     const data = await res.json();
     if (res.status === 401) { logout(); return; }
@@ -424,13 +465,23 @@ function showAmendResult(r) {
   $("rElemCount").textContent = (r.elements||[]).length;
   $("rElapsed").textContent = r.elapsed ? Math.round(r.elapsed) + "s" : "-";
   $("rModel").textContent = r.model === "api" ? "Claude API" : "Qwen 72B";
+  $("rScope").textContent = r.scope_strength || "balanced";
   const pl = $("rPaList"); pl.innerHTML = "";
   (r.prior_arts||[]).forEach(pa => { const s = document.createElement("span"); s.className = "tag"; s.textContent = (pa.alias||"?")+" ("+(pa.identifier||"")+")"; pl.appendChild(s); });
   if (r.report_available) $("amendReportSection").classList.remove("hidden");
   $("rOrigClaim").value = r.claim1_text || "";
   const rb = $("rankBody"); rb.innerHTML = "";
-  (r.ranked_amendments||[]).forEach(ra => { const tr = document.createElement("tr"); tr.innerHTML = '<td class="rank-num">'+ra.rank+'</td><td>'+ra.amendment_id+'</td><td class="score">'+(ra.scope_score||0).toFixed(2)+'</td><td class="score">'+(ra.diff_score||0).toFixed(2)+'</td><td class="score">'+(ra.arg_score||0).toFixed(2)+'</td><td class="score" style="color:var(--primary)">'+(ra.total_score||0).toFixed(2)+'</td><td>'+(ra.summary||"")+'</td>'; rb.appendChild(tr); });
+  (r.ranked_amendments||[]).forEach(ra => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td class="rank-num">'+ra.rank+'</td><td>'+ra.amendment_id+'</td>'
+      +'<td class="score">'+(ra.scope_impact||"-")+'</td>'
+      +'<td class="score">'+(ra.differentiation_strength||"-")+'</td>'
+      +'<td class="score">'+(ra.argument_persuasiveness||"-")+'</td>'
+      +'<td>'+(ra.summary||"")+'</td>';
+    rb.appendChild(tr);
+  });
   buildAmendTabs(r);
+  buildCitationPanels(r);
 }
 
 function buildAmendTabs(r) {
@@ -444,11 +495,74 @@ function buildAmendTabs(r) {
     btn.textContent = "#"+ra.rank+" "+aid; btn.onclick = function(){ switchAmendTab(i, this); }; te.appendChild(btn);
     const a = am.find(x=>x.id===aid)||{}, v = vf.find(x=>x.amendment_id===aid)||{}, g = ag.find(x=>x.amendment_id===aid)||{};
     const pt = v.pass?'<span class="tag tag-pass">PASS</span>':'<span class="tag tag-fail">FAIL</span>';
+    const failInfo = v.fail_reason ? '<div style="font-size:0.8rem;color:var(--error);margin-bottom:6px">Fail: '+v.fail_reason+'</div>' : '';
     const panel = document.createElement("div"); panel.className = "tab-panel amend-detail"+(i===0?" active":""); panel.id = "amend-panel-"+i;
-    panel.innerHTML = '<h4>'+aid+' ('+( a.source||"-")+')</h4><div class="amend-scores"><span>Scope: '+(ra.scope_score||0).toFixed(2)+'</span><span>Diff: '+(ra.diff_score||0).toFixed(2)+'</span><span>Arg: '+(ra.arg_score||0).toFixed(2)+'</span><span style="background:#dbeafe;font-weight:700">Total: '+(ra.total_score||0).toFixed(2)+'</span>'+pt+'</div><div style="font-size:0.82rem;color:var(--muted);margin-bottom:4px">Amended Claim 1</div><textarea rows="5" readonly>'+(a.amended_claim1||"(none)")+'</textarea><div style="font-size:0.82rem;color:var(--muted);margin:8px 0 4px">Argument</div><textarea rows="3" readonly>'+(g.argument||"(none)")+'</textarea>';
+    panel.innerHTML = '<h4>'+aid+' ('+(a.source_type||a.source||"-")+')</h4>'
+      +'<div class="amend-scores">'
+      +'<span>Scope: '+(ra.scope_impact||"-")+'</span>'
+      +'<span>Diff: '+(ra.differentiation_strength||"-")+'</span>'
+      +'<span>Arg: '+(ra.argument_persuasiveness||"-")+'</span>'
+      +pt+'</div>'
+      +failInfo
+      +'<div style="font-size:0.82rem;color:var(--muted);margin-bottom:4px">Amended Claim 1</div>'
+      +'<textarea rows="5" readonly>'+(a.amended_claim1||"(none)")+'</textarea>'
+      +'<div style="font-size:0.82rem;color:var(--muted);margin:8px 0 4px">Argument</div>'
+      +'<textarea rows="3" readonly>'+(g.argument||"(none)")+'</textarea>';
     pe.appendChild(panel);
   }
   if (!n) pe.innerHTML = '<p style="color:var(--muted)">No ranked results.</p>';
+}
+
+function buildCitationPanels(r) {
+  const section = document.getElementById("citationSection");
+  const container = document.getElementById("citationPanels");
+  container.innerHTML = "";
+  const citations = r.top3_citations || [];
+  if (!citations.length) return;
+  section.classList.remove("hidden");
+
+  citations.forEach((cit, i) => {
+    const div = document.createElement("div");
+    div.className = "amend-detail";
+    let html = '<h4>#'+(i+1)+' '+cit.amendment_id+'</h4>';
+
+    // Spec citations
+    const specs = cit.spec_citations || [];
+    if (specs.length) {
+      html += '<div style="font-size:0.82rem;font-weight:600;color:var(--primary);margin:8px 0 4px">Specification Citations</div>';
+      specs.forEach(sc => {
+        html += '<div style="margin-left:12px;margin-bottom:6px;font-size:0.84rem">'
+          +'<span style="font-weight:600;color:var(--primary)">['+sc.para+']</span> '
+          +(sc.quote ? '<span style="font-style:italic;color:var(--muted)">"'+sc.quote.substring(0,200)+'"</span>' : '')
+          +'</div>';
+      });
+      if (cit.spec_basis) {
+        html += '<div style="margin-left:12px;font-size:0.82rem;color:var(--muted)">Basis: '+cit.spec_basis+'</div>';
+      }
+    }
+
+    // PA citations
+    const pas = cit.pa_citations || [];
+    if (pas.length) {
+      html += '<div style="font-size:0.82rem;font-weight:600;color:#8A1A1A;margin:10px 0 4px">Prior Art Citations</div>';
+      if (cit.pa_teaching) {
+        html += '<div style="margin-left:12px;font-size:0.82rem;margin-bottom:4px">PA teaching: '+cit.pa_teaching.substring(0,300)+'</div>';
+      }
+      pas.forEach(pc => {
+        html += '<div style="margin-left:12px;margin-bottom:4px;font-size:0.84rem">'
+          +'<span style="font-weight:600;color:#8A1A1A">['+pc.para+']</span> '
+          +(pc.quote ? '<span style="font-style:italic;color:var(--muted)">"'+pc.quote.substring(0,200)+'"</span>' : '')
+          +'</div>';
+      });
+    }
+
+    if (!specs.length && !pas.length) {
+      html += '<p style="font-size:0.82rem;color:var(--muted)">No citation evidence available.</p>';
+    }
+
+    div.innerHTML = html;
+    container.appendChild(div);
+  });
 }
 
 function showOaResult(r) {
@@ -488,7 +602,7 @@ function showErr(prefix, msg) {
 }
 
 function resetJobUI() {
-  ["amend-progress","amend-result","amend-error","amendReportSection","oa-progress","oa-result","oa-error","oaAllowSection"].forEach(id => {
+  ["amend-progress","amend-result","amend-error","amendReportSection","citationSection","oa-progress","oa-result","oa-error","oaAllowSection"].forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.add("hidden");
   });
   ["amendBar","oaBar"].forEach(id => { const el = document.getElementById(id); if (el) el.style.width = "0%"; });
