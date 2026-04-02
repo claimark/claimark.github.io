@@ -208,27 +208,35 @@
     <details style="margin-bottom:12px">
       <summary style="font-size:0.85rem;color:var(--muted);cursor:pointer">Advanced Options</summary>
       <div style="margin-top:10px">
-        <div class="form-row" style="margin-bottom:10px">
+        <div class="form-row" style="margin-bottom:12px">
           <div class="form-group" style="margin-bottom:0">
-            <label>Amendment Scope</label>
+            <label>Amendment Strategy</label>
             <select id="optScope">
-              <option value="conservative">Conservative (minimal change)</option>
+              <option value="conservative">Conservative — minimize scope narrowing</option>
               <option value="balanced" selected>Balanced (default)</option>
-              <option value="aggressive">Aggressive (broader protection)</option>
+              <option value="aggressive">Aggressive — maximize differentiation</option>
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label>Candidate Limit (0 = process all)</label>
+            <label>Candidate Limit per type (0 = all)</label>
             <input type="number" id="optTopK" value="0" min="0" max="20" style="width:100%" />
           </div>
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label>Report Sections</label>
-          <select id="optReport">
-            <option value="full" selected>Full Report (all sections)</option>
-            <option value="m1,m6,m7">Summary Only (Analysis + Verification + Ranking)</option>
-            <option value="none">No Report (results only)</option>
-          </select>
+          <label>Report Contents</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:4px;font-size:0.85rem">
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m1" checked /> Patent Analysis (M1)</label>
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m2" checked /> OA Parsing (M2)</label>
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m3" checked /> Fact Comparison (M3)</label>
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m4" checked /> Candidates (M4)</label>
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m5" checked /> Drafted Amendments (M5)</label>
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m6" checked /> Verification & Arguments (M6)</label>
+            <label class="checkbox-row"><input type="checkbox" class="rptChk" value="m7" checked /> Final Ranking (M7)</label>
+          </div>
+          <div style="margin-top:6px">
+            <span style="font-size:0.78rem;color:var(--primary);cursor:pointer;margin-right:12px" onclick="toggleRptAll(true)">Select All</span>
+            <span style="font-size:0.78rem;color:var(--muted);cursor:pointer" onclick="toggleRptAll(false)">Deselect All</span>
+          </div>
         </div>
       </div>
     </details>
@@ -376,7 +384,7 @@ async function submitAmendment() {
         model: _selectedModel,
         scope_strength: document.getElementById("optScope").value,
         top_k: parseInt(document.getElementById("optTopK").value) || 0,
-        report_sections: document.getElementById("optReport").value,
+        report_sections: getReportSections(),
       }),
     });
     const data = await res.json();
@@ -607,6 +615,18 @@ function resetJobUI() {
   });
   ["amendBar","oaBar"].forEach(id => { const el = document.getElementById(id); if (el) el.style.width = "0%"; });
   const lb = document.getElementById("amendLog"); if (lb) lb.textContent = "";
+}
+
+function getReportSections() {
+  const checks = document.querySelectorAll(".rptChk");
+  const checked = [...checks].filter(c => c.checked).map(c => c.value);
+  if (checked.length === 0) return "none";
+  if (checked.length === checks.length) return "full";
+  return checked.join(",");
+}
+
+function toggleRptAll(on) {
+  document.querySelectorAll(".rptChk").forEach(c => c.checked = on);
 }
 
 async function init() {
