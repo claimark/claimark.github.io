@@ -191,11 +191,11 @@
   <div class="card" style="margin-top:12px">
     <h2>Claim Amendment System</h2>
     <div class="model-selector">
-      <div class="model-option active" id="opt-local" onclick="selectModel('local')">
+      <div class="model-option" id="opt-local" onclick="selectModel('local')" style="display:none">
         <div class="model-name">Local Model</div>
         <div class="model-desc">Qwen 2.5 72B AWQ (GPU)</div>
       </div>
-      <div class="model-option" id="opt-api" onclick="selectModel('api')">
+      <div class="model-option active" id="opt-api" onclick="selectModel('api')">
         <div class="model-name">Claude API</div>
         <div class="model-desc">Claude Sonnet (Anthropic)</div>
       </div>
@@ -331,7 +331,7 @@ let _token = localStorage.getItem("claimark_token") || null;
 let _pollTimer = null;
 let _currentJobId = null;
 let _currentSystem = null;
-let _selectedModel = "local";
+let _selectedModel = "api";
 
 function authHeaders() { return { "Authorization": "Bearer " + _token }; }
 
